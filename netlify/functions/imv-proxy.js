@@ -1,45 +1,57 @@
 // netlify/functions/imv-proxy.js
+// Прокси Netlify → Make webhook. Без внешних библиотек.
+
 exports.handler = async (event) => {
-  const cors = {
+  const CORS = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   };
 
-  if (event.httpMethod === "OPTIONS")
-    return { statusCode: 204, headers: cors, body: "" };
-  if (event.httpMethod !== "POST")
-    return { statusCode: 405, headers: cors, body: "Method Not Allowed" };
+  // Предзапросы браузера
+  if (event.httpMethod === "OPTIONS") {
+    return { statusCode: 204, headers: CORS, body: "" };
+  }
 
-  const url = process.env.MAKE_WEBHOOK_URL;
-  if (!url) {
-    return { statusCode: 500, headers: cors, body: JSON.stringify({ error: "No MAKE_WEBHOOK_URL" }) };
+  // Принимаем только POST
+  if (event.httpMethod !== "POST") {
+    return {
+      statusCode: 405,
+      headers: { ...CORS, "Content-Type": "application/json" },
+      body: JSON.stringify({ error: "Only POST is allowed" }),
+    };
+  }
+
+  const WEBHOOK = process.env.MAKE_WEBHOOK_URL;
+  if (!WEBHOOK) {
+    return {
+      statusCode: 500,
+      headers: { ...CORS, "Content-Type": "application/json" },
+      body: JSON.stringify({ error: "MAKE_WEBHOOK_URL is missing" }),
+    };
   }
 
   try {
-    const resp = await fetch(url, {
+    // Пробрасываем тело запроса как есть
+    const upstream = await fetch(WEBHOOK, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: event.body || "{}",
     });
 
-    const text = await resp.text();
+    const text = await upstream.text(); // не трогаем формат, отдаём как вернул Make
 
-    // Если Make вернул не 2xx — пробросим и тело, и статус для диагностики
-    if (!resp.ok) {
-      return {
-        statusCode: resp.status,
-        headers: { ...cors, "Content-Type": resp.headers.get("content-type") || "application/json" },
-        body: text || JSON.stringify({ error: "Upstream error from Make", status: resp.status }),
-      };
-    }
-
+    // Если Make вернул ошибку — пробросим статус и тело для прозрачной диагностики
     return {
-      statusCode: 200,
-      headers: { ...cors, "Content-Type": "application/json" },
-      body: text,
+      statusCode: upstream.status,
+      headers: { ...CORS, "Content-Type": "application/json" },
+      body: text || JSON.stringify({ error: "Empty response from Make" }),
     };
-  } catch (e) {
-    return { statusCode: 500, headers: cors, body: JSON.stringify({ error: e.message }) };
+  } catch (err) {
+    return {
+      statusCode: 500,
+      headers: { ...CORS, "Content-Type": "application/json" },
+      body: JSON.stringify({ error: err.message || "Proxy failed" }),
+    };
   }
 };
