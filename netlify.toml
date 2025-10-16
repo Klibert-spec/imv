@@ -1,6 +1,6 @@
 [functions]
   directory = "netlify/functions"
-  node_bundler = "esbuild"
+  node_bundler = "esbuild"  # пусть сам соберёт
 
 [[headers]]
   for = "/.netlify/functions/*"
