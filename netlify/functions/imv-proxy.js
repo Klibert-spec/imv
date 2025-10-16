@@ -8,12 +8,10 @@ exports.handler = async (event) => {
     "Access-Control-Allow-Headers": "Content-Type",
   };
 
-  // Предзапросы браузера
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: CORS, body: "" };
   }
 
-  // Принимаем только POST
   if (event.httpMethod !== "POST") {
     return {
       statusCode: 405,
@@ -32,16 +30,14 @@ exports.handler = async (event) => {
   }
 
   try {
-    // Пробрасываем тело запроса как есть
     const upstream = await fetch(WEBHOOK, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: event.body || "{}",
     });
 
-    const text = await upstream.text(); // не трогаем формат, отдаём как вернул Make
+    const text = await upstream.text();
 
-    // Если Make вернул ошибку — пробросим статус и тело для прозрачной диагностики
     return {
       statusCode: upstream.status,
       headers: { ...CORS, "Content-Type": "application/json" },
