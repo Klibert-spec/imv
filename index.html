@@ -390,5 +390,30 @@
     // Initialize view
     showTab('upload');
   </script>
+  <script>
+  const API = "/.netlify/functions/imv-proxy";
+
+  async function sendToAPI(imageData) {
+    try {
+      const res = await fetch(API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: imageData })
+      });
+      const json = await res.json();
+      console.log("Ответ от функции:", json);
+      alert("Оценка: " + JSON.stringify(json));
+    } catch (err) {
+      console.error("Ошибка:", err);
+      alert("Ошибка API: " + err.message);
+    }
+  }
+
+  // Привязываем к кнопке (должна быть кнопка с id="estimateBtn")
+  document.getElementById("estimateBtn").addEventListener("click", () => {
+    const img = document.getElementById("result-photo").src; // берём картинку
+    sendToAPI(img);
+  });
+</script>
 </body>
 </html>
