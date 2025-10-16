@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Instant Market Value</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 0; background:#fafafa; color:#222; }
+    header { padding: 1rem; text-align: center; font-size: 1.4rem; font-weight: 600; border-bottom:1px solid #eee;}
+    nav { display:flex; justify-content: space-around; border-bottom:1px solid #eee; background:#fff;}
+    nav button { flex:1; padding:1rem; border:none; background:none; font-size:1rem; cursor:pointer; }
+    nav button.active { border-bottom:2px solid #007aff; font-weight:600; color:#007aff;}
+    .tab { display:none; padding:2rem;}
+    .tab.active { display:block;}
+    .card { border:1px solid #eee; border-radius:12px; padding:1rem; margin:1rem 0; background:#fff; box-shadow:0 2px 4px rgba(0,0,0,0.05);}
+    .preview { max-width:200px; margin:1rem auto; display:block; border-radius:12px; border:1px solid #ccc;}
+    #history .item { display:flex; align-items:center; margin-bottom:1rem; }
+    #history .item img { width:50px; height:50px; object-fit:cover; border-radius:8px; margin-right:1rem;}
+    .skeleton { background:linear-gradient(90deg,#eee 25%,#ddd 50%,#eee 75%); background-size:200% 100%; animation:shimmer 1.5s infinite; border-radius:8px; }
+    @keyframes shimmer { 0%{background-position:-200% 0;} 100%{background-position:200% 0;} }
+  </style>
+</head>
+<body>
+  <header>📸 Instant Market Value</header>
+  <nav>
+    <button id="tabUpload" class="active">Загрузка</button>
+    <button id="tabResult">Результат</button>
+    <button id="tabHistory">История</button>
+  </nav>
+
+  <main>
+    <!-- Upload -->
+    <section id="upload" class="tab active">
+      <div class="card">
+        <input type="file" id="fileInput" accept="image/*" />
+        <img id="preview" class="preview" hidden />
+        <div><label><input type="checkbox" id="bgToggle" /> Убрать фон</label></div>
+        <button id="estimateBtn">Оценить</button>
+      </div>
+    </section>
+
+    <!-- Result -->
+    <section id="result" class="tab">
+      <div class="card">
+        <img id="result-photo" class="preview" hidden />
+        <div id="resSkeleton" class="skeleton" style="height:100px;width:100%;"></div>
+        <div id="resContent" hidden>
+          <p id="priceRange">—</p>
+          <ul>
+            <li>Категория: <span id="m-category">—</span></li>
+            <li>Бренд: <span id="m-brand">—</span></li>
+            <li>Материал: <span id="m-material">—</span></li>
+            <li>Состояние: <span id="m-condition">—</span></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- History -->
+    <section id="history" class="tab">
+      <div class="card" id="historyList">История пуста</div>
+    </section>
+  </main>
+
+  <script>
+    // переключение вкладок
+    const tabBtns = { upload:document.getElementById('tabUpload'), result:document.getElementById('tabResult'), history:document.getElementById('tabHistory') };
+    const tabs = { upload:document.getElementById('upload'), result:document.getElementById('result'), history:document.getElementById('history') };
+    function showTab(name){
+      Object.values(tabBtns).forEach(b=>b.classList.remove('active'));
+      Object.values(tabs).forEach(t=>t.classList.remove('active'));
+      tabBtns[name].classList.add('active');
+      tabs[name].classList.add('active');
+    }
+    tabBtns.upload.onclick=()=>showTab('upload');
+    tabBtns.result.onclick=()=>showTab('result');
+    tabBtns.history.onclick=()=>showTab('history');
+
+    const fileInput=document.getElementById('fileInput');
+    const preview=document.getElementById('preview');
+    const resultPhoto=document.getElementById('result-photo');
+    const estimateBtn=document.getElementById('estimateBtn');
+    const resSkeleton=document.getElementById('resSkeleton');
+    const resContent=document.getElementById('resContent');
+    const historyList=document.getElementById('historyList');
+    let history=[];
+
+    // превью при загрузке
+    fileInput.addEventListener('change',e=>{
+      const file=e.target.files[0];
+      if(file){
+        const url=URL.createObjectURL(file);
+        preview.src=url; preview.hidden=false;
+        resultPhoto.src=url; resultPhoto.hidden=false;
+      }
+    });
+
+    // API proxy
+    const API="/.netlify/functions/imv-proxy";
+
+    async function shrinkDataURL(dataURL, maxW=1280, quality=0.85){
+      const img=new Image(); img.src=dataURL; await img.decode();
+      const k=Math.min(1,maxW/Math.max(img.width,img.height));
+      const w=Math.round(img.width*k), h=Math.round(img.height*k);
+      const c=document.createElement("canvas"); c.width=w; c.height=h;
+      c.getContext("2d").drawImage(img,0,0,w,h);
+      return c.toDataURL("image/jpeg",quality);
+    }
+
+    async function sendToAPI(dataURL, removeBg){
+      const shrunk=await shrinkDataURL(dataURL,1280,0.85);
+      const res=await fetch(API,{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({ image_base64:shrunk, opts:{remove_bg:!!removeBg} })
+      });
+      if(!res.ok) throw new Error("API "+res.status);
+      return await res.json();
+    }
+
+    // обработчик кнопки
+    estimateBtn.addEventListener('click', async ()=>{
+      showTab('result');
+      resContent.hidden=true; resSkeleton.hidden=false;
+      try{
+        const imgSrc=resultPhoto.src;
+        const payload=await sendToAPI(imgSrc, document.getElementById('bgToggle').checked);
+
+        document.getElementById('priceRange').textContent=`💰 Рыночная стоимость: ${payload.price_min}–${payload.price_max} €`;
+        document.getElementById('m-category').textContent=payload.category||'—';
+        document.getElementById('m-brand').textContent=payload.brand||'—';
+        document.getElementById('m-material').textContent=payload.material||'—';
+        document.getElementById('m-condition').textContent=payload.condition||'—';
+
+        const item={id:Date.now(), thumb:imgSrc, title:`${payload.brand||'Товар'} ${payload.category||''}`.trim(), priceMin:payload.price_min, priceMax:payload.price_max, condition:payload.condition||'—'};
+        history.unshift(item);
+        renderHistory();
+      }catch(e){ alert("Ошибка оценки: "+e.message); }
+      finally{ setTimeout(()=>{resSkeleton.hidden=true; resContent.hidden=false;},300); }
+    });
+
+    function renderHistory(){
+      if(!history.length){ historyList.innerHTML="История пуста"; return; }
+      historyList.innerHTML="";
+      history.forEach(h=>{
+        const div=document.createElement('div'); div.className="item";
+        div.innerHTML=`<img src="${h.thumb}"/><div><strong>${h.title}</strong><br/>${h.priceMin}–${h.priceMax} €</div>`;
+        historyList.appendChild(div);
+      });
+    }
+  </script>
+</body>
+</html>
