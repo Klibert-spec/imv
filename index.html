@@ -390,30 +390,51 @@
     // Initialize view
     showTab('upload');
   </script>
-  <script>
+ <script>
   const API = "/.netlify/functions/imv-proxy";
 
-  async function sendToAPI(imageData) {
-    try {
-      const res = await fetch(API, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: imageData })
-      });
-      const json = await res.json();
-      console.log("Ответ от функции:", json);
-      alert("Оценка: " + JSON.stringify(json));
-    } catch (err) {
-      console.error("Ошибка:", err);
-      alert("Ошибка API: " + err.message);
-    }
-  }
+  // гарантируем, что кнопка делает POST, а не сабмит формы
+  const btn = document.getElementById("estimateBtn");
+  if (btn) {
+    btn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try {
+        const img = document.getElementById("result-photo").src;
+        // если вдруг превью пустое — берём из input
+        if (!img) {
+          const f = document.getElementById("fileInput").files?.[0];
+          if (!f) throw new Error("Сначала выбери фото");
+          const u = URL.createObjectURL(f);
+          document.getElementById("result-photo").src = u;
+        }
 
-  // Привязываем к кнопке (должна быть кнопка с id="estimateBtn")
-  document.getElementById("estimateBtn").addEventListener("click", () => {
-    const img = document.getElementById("result-photo").src; // берём картинку
-    sendToAPI(img);
-  });
+        const res = await fetch(API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            image_base64: document.getElementById("result-photo").src,
+            opts: { remove_bg: !!document.getElementById("bgToggle")?.checked }
+          })
+        });
+
+        const text = await res.text();
+        if (!res.ok) throw new Error(`API ${res.status}: ${text}`);
+
+        const data = JSON.parse(text);
+        // отрисовка результата
+        document.getElementById("priceRange").textContent =
+          `💰 Рыночная стоимость: ${data.price_min}–${data.price_max} €`;
+        document.getElementById("m-category").textContent = data.category || "—";
+        document.getElementById("m-brand").textContent = data.brand || "—";
+        document.getElementById("m-material").textContent = data.material || "—";
+        document.getElementById("m-condition").textContent = data.condition || "—";
+        // переключаемся на вкладку "Результат"
+        document.getElementById("tabResult").click();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  }
 </script>
 </body>
 </html>
