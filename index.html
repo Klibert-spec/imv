@@ -1,153 +1,394 @@
-<!DOCTYPE html>
+
+<!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Instant Market Value</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Instant Market Value — Prototype</title>
+  <meta name="color-scheme" content="light only" />
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 0; background:#fafafa; color:#222; }
-    header { padding: 1rem; text-align: center; font-size: 1.4rem; font-weight: 600; border-bottom:1px solid #eee;}
-    nav { display:flex; justify-content: space-around; border-bottom:1px solid #eee; background:#fff;}
-    nav button { flex:1; padding:1rem; border:none; background:none; font-size:1rem; cursor:pointer; }
-    nav button.active { border-bottom:2px solid #007aff; font-weight:600; color:#007aff;}
-    .tab { display:none; padding:2rem;}
-    .tab.active { display:block;}
-    .card { border:1px solid #eee; border-radius:12px; padding:1rem; margin:1rem 0; background:#fff; box-shadow:0 2px 4px rgba(0,0,0,0.05);}
-    .preview { max-width:200px; margin:1rem auto; display:block; border-radius:12px; border:1px solid #ccc;}
-    #history .item { display:flex; align-items:center; margin-bottom:1rem; }
-    #history .item img { width:50px; height:50px; object-fit:cover; border-radius:8px; margin-right:1rem;}
-    .skeleton { background:linear-gradient(90deg,#eee 25%,#ddd 50%,#eee 75%); background-size:200% 100%; animation:shimmer 1.5s infinite; border-radius:8px; }
-    @keyframes shimmer { 0%{background-position:-200% 0;} 100%{background-position:200% 0;} }
+    :root {
+      --bg: #ffffff;
+      --surface: #ffffff;
+      --text: #0a0a0a;
+      --muted: #6b7280; /* gray-500 */
+      --border: #0A84FF; /* electric blue outline */
+      --border-soft: #e5f0ff;
+      --accent: #0A84FF;
+      --accent-2: #30D158; /* apple green for success */
+      --shadow: 0 6px 24px rgba(16, 24, 40, 0.08), 0 2px 6px rgba(16, 24, 40, 0.06);
+      --radius-lg: 20px;
+      --radius-md: 14px;
+      --radius-sm: 10px;
+      --focus: 0 0 0 3px rgba(10,132,255,0.25);
+      --transition: 180ms cubic-bezier(.2,.8,.2,1);
+    }
+    html, body { height: 100%; background: var(--bg); color: var(--text); }
+    body { font: 16px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text",Inter,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif; margin: 0; }
+
+    .app {
+      max-width: 1080px; margin: 0 auto; padding: 24px; display: grid; gap: 24px;
+    }
+    header.appbar {
+      position: sticky; top: 0; z-index: 10; backdrop-filter: saturate(180%) blur(12px);
+      background: color-mix(in srgb, var(--bg) 88%, #ffffff 12%);
+      border-bottom: 1px solid #eef2f7; padding: 16px 24px; border-radius: 0 0 24px 24px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 600; letter-spacing: .2px; }
+    .badge { padding: 6px 10px; border: 2px solid var(--border); color: var(--accent); border-radius: 999px; font-size: 12px; font-weight: 600; }
+
+    .tabs { display: inline-flex; border: 2px solid var(--border); border-radius: 14px; padding: 4px; gap: 4px; background: var(--surface); box-shadow: var(--shadow); }
+    .tabbtn { appearance: none; background: transparent; border: 0; padding: 10px 14px; border-radius: 10px; font-weight: 600; color: var(--muted); cursor: pointer; transition: var(--transition); }
+    .tabbtn[aria-selected="true"] { background: var(--border-soft); color: var(--text); box-shadow: inset 0 0 0 2px var(--border); }
+    .tabbtn:focus-visible { outline: none; box-shadow: var(--focus); }
+
+    main { display: grid; gap: 24px; }
+
+    .card { background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow); border: 2px solid var(--border); }
+    .panel { padding: 20px; }
+    .panel h2 { margin: 0 0 8px; font-size: 22px; letter-spacing: .2px; }
+    .sub { color: var(--muted); font-size: 14px; margin-bottom: 14px; }
+
+    /* Upload */
+    .dropzone { position: relative; border: 2.5px dashed var(--border); border-radius: var(--radius-lg); padding: 28px; text-align: center; background: #f8fbff; transition: var(--transition); }
+    .dropzone.drag { background: #eef6ff; transform: scale(0.998); }
+    .dropzone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .dz-emoji { font-size: 36px; }
+    .dz-title { font-weight: 600; margin-top: 8px; }
+    .dz-hint { color: var(--muted); font-size: 14px; }
+
+    .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .spacer { flex: 1 1 auto; }
+
+    .switch { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+    .switch input { appearance: none; width: 44px; height: 26px; background: #e5e7eb; border-radius: 999px; position: relative; outline: none; transition: var(--transition); box-shadow: inset 0 0 0 2px #e5e7eb; }
+    .switch input:checked { background: color-mix(in srgb, var(--accent) 24%, #e5f0ff); box-shadow: inset 0 0 0 2px var(--accent); }
+    .switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.15); transition: var(--transition); }
+    .switch input:checked::after { transform: translateX(18px); }
+
+    .btn { appearance: none; border: 2px solid var(--border); background: var(--surface); color: var(--text); padding: 12px 16px; border-radius: 14px; font-weight: 700; cursor: pointer; transition: var(--transition); }
+    .btn.primary { background: #f2f8ff; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow); }
+    .btn:focus-visible { outline: none; box-shadow: var(--focus); }
+
+    .preview { width: 120px; height: 120px; border-radius: 24px; object-fit: cover; object-position: center; background: #f4f6f8; border: 2px solid var(--border); }
+
+    /* Result */
+    .metrics { display: grid; grid-template-columns: repeat(auto-fit,minmax(160px,1fr)); gap: 12px; }
+    .metric { border: 2px solid var(--border); border-radius: var(--radius-md); padding: 12px; background: var(--surface); }
+    .metric .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .6px; }
+    .metric .value { font-weight: 700; }
+
+    .price-pill { display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 999px; border:2px solid var(--accent); background: #edf6ff; font-weight: 800; font-size: 18px; }
+    .price-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+
+    .liquidity { display: grid; gap: 8px; }
+    .bar { height: 8px; border-radius: 999px; background: #eef2f7; position: relative; overflow: hidden; border: 2px solid var(--border); }
+    .bar > i { display: block; height: 100%; width: 62%; background: linear-gradient(90deg, var(--accent), #7cc4ff); }
+    .legend { display:flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+
+    /* History */
+    .list { display: grid; gap: 12px; }
+    .item { display: grid; grid-template-columns: 72px 1fr auto; gap: 12px; align-items: center; padding: 12px; border:2px solid var(--border); border-radius: var(--radius-md); background: var(--surface); cursor: pointer; transition: var(--transition); }
+    .item:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+    .item .thumb { width: 72px; height: 72px; border-radius: 16px; object-fit: cover; border:2px solid var(--border); background:#f4f6f8; }
+    .item .title { font-weight: 700; }
+    .item .meta { color: var(--muted); font-size: 12px; }
+
+    .empty { text-align: center; color: var(--muted); padding: 28px; }
+
+    /* Skeleton */
+    .skeleton { display: grid; gap: 12px; }
+    .shimmer { position: relative; overflow: hidden; background: #eef2f7; height: 16px; border-radius: 8px; }
+    .shimmer::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent); transform: translateX(-100%); animation: loading 1s infinite; }
+    @keyframes loading { to { transform: translateX(100%); } }
+
+    /* Sheet */
+    dialog.sheet { width: min(520px, 92vw); border: 2px solid var(--border); border-radius: 18px; padding: 0; box-shadow: var(--shadow); }
+    .sheet header { padding: 16px 18px; border-bottom: 1px solid #eef2f7; display:flex; align-items:center; justify-content: space-between; }
+    .sheet .content { padding: 12px; display:grid; gap:8px; }
+    .sheet .rowlink { display:flex; align-items:center; gap:10px; padding:12px; border:2px solid var(--border); border-radius:14px; background:#f8fbff; cursor:pointer; }
+    .sheet .rowlink:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      .actions { flex-direction: column; align-items: stretch; }
+      .item { grid-template-columns: 60px 1fr; }
+    }
   </style>
 </head>
 <body>
-  <header>📸 Instant Market Value</header>
-  <nav>
-    <button id="tabUpload" class="active">Загрузка</button>
-    <button id="tabResult">Результат</button>
-    <button id="tabHistory">История</button>
-  </nav>
+  <header class="appbar">
+    <div class="app">
+      <div class="row">
+        <div class="brand" aria-label="Instant Market Value">
+          <span class="badge">IMV</span>
+          <span>Instant Market Value</span>
+        </div>
+        <div class="spacer"></div>
+        <nav class="tabs" role="tablist" aria-label="Primary">
+          <button class="tabbtn" role="tab" aria-selected="true" data-tab="upload">📸 Загрузка</button>
+          <button class="tabbtn" role="tab" aria-selected="false" data-tab="result">💰 Результат</button>
+          <button class="tabbtn" role="tab" aria-selected="false" data-tab="history">🕘 История</button>
+        </nav>
+      </div>
+    </div>
+  </header>
 
-  <main>
-    <!-- Upload -->
-    <section id="upload" class="tab active">
-      <div class="card">
-        <input type="file" id="fileInput" accept="image/*" />
-        <img id="preview" class="preview" hidden />
-        <div><label><input type="checkbox" id="bgToggle" /> Убрать фон</label></div>
-        <button id="estimateBtn">Оценить</button>
+  <main class="app" id="app">
+    <!-- Upload Panel -->
+    <section class="card panel" id="panel-upload" role="tabpanel" aria-labelledby="tab-upload">
+      <h2>📸 Загрузка фото</h2>
+      <p class="sub">Добавь 1 фото вещи. Без описаний и категорий.</p>
+
+      <div class="dropzone" id="dropzone" aria-label="Зона загрузки">
+        <input id="file" type="file" accept="image/*" aria-label="Выбрать фото" />
+        <div class="dz-emoji">📤</div>
+        <div class="dz-title">Перетащи изображение сюда или нажми, чтобы выбрать</div>
+        <div class="dz-hint">Поддерживается drag & drop. Превью появится ниже.</div>
+      </div>
+
+      <div class="row" style="margin-top:14px">
+        <label class="switch" title="Автоматически убирать фон (мок)">
+          <input id="bgToggle" type="checkbox" />
+          <span>Автообрезка фона</span>
+        </label>
+        <div class="spacer"></div>
+        <button id="estimateBtn" class="btn primary" disabled>Оценить</button>
+      </div>
+
+      <div class="row" style="margin-top:14px">
+        <img id="preview" class="preview" alt="Превью загруженного фото" hidden>
       </div>
     </section>
 
-    <!-- Result -->
-    <section id="result" class="tab">
-      <div class="card">
-        <img id="result-photo" class="preview" hidden />
-        <div id="resSkeleton" class="skeleton" style="height:100px;width:100%;"></div>
-        <div id="resContent" hidden>
-          <p id="priceRange">—</p>
-          <ul>
-            <li>Категория: <span id="m-category">—</span></li>
-            <li>Бренд: <span id="m-brand">—</span></li>
-            <li>Материал: <span id="m-material">—</span></li>
-            <li>Состояние: <span id="m-condition">—</span></li>
-          </ul>
+    <!-- Result Panel -->
+    <section class="card panel" id="panel-result" role="tabpanel" hidden>
+      <div id="result-skeleton" class="skeleton" hidden>
+        <div class="shimmer" style="height:28px;width:60%"></div>
+        <div class="shimmer" style="height:16px;width:40%"></div>
+        <div class="shimmer" style="height:120px;width:100%;border-radius:16px"></div>
+        <div class="shimmer" style="height:16px;width:70%"></div>
+        <div class="shimmer" style="height:16px;width:55%"></div>
+      </div>
+
+      <div id="result-content">
+        <div class="row" style="align-items:center; gap:16px">
+          <img id="result-photo" class="preview" alt="Фото вещи" src="" aria-hidden="true">
+          <div class="price-pill" aria-live="polite"><span class="dot"></span><span id="priceRange">💰 Рыночная стоимость: 48–63 €</span></div>
+        </div>
+        <p class="sub">Оценка по фото и контексту рынка.</p>
+
+        <div class="metrics" style="margin-top:8px">
+          <div class="metric"><div class="label">Категория</div><div class="value" id="m-category">Сумка</div></div>
+          <div class="metric"><div class="label">Бренд</div><div class="value" id="m-brand">Michael Kors</div></div>
+          <div class="metric"><div class="label">Материал</div><div class="value" id="m-material">Кожа</div></div>
+          <div class="metric">
+            <div class="label">Состояние</div><div class="value" id="m-condition">Хорошее</div>
+            <div class="liquidity" style="margin-top:8px">
+              <div class="label">Ликвидность</div>
+              <div class="bar" aria-label="Ликвидность: выше среднего"><i style="width:62%"></i></div>
+              <div class="legend"><span>Низкая</span><span>Высокая</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn primary" id="sellBtn">Продать</button>
+          <button class="btn" id="saveBtn">Сохранить в историю</button>
+          <button class="btn" id="newBtn">Новая оценка</button>
         </div>
       </div>
     </section>
 
-    <!-- History -->
-    <section id="history" class="tab">
-      <div class="card" id="historyList">История пуста</div>
+    <!-- History Panel -->
+    <section class="card panel" id="panel-history" role="tabpanel" hidden>
+      <h2>🕘 История</h2>
+      <div id="history-empty" class="empty" hidden>История пуста. Оцени первую вещь.</div>
+      <div id="history-list" class="list" role="list"></div>
     </section>
   </main>
 
+  <!-- Sell sheet -->
+  <dialog class="sheet" id="sheet">
+    <header>
+      <strong>Куда отправить объявление</strong>
+      <button class="btn" id="closeSheet" aria-label="Закрыть">Закрыть</button>
+    </header>
+    <div class="content">
+      <div class="rowlink" data-link="#">Vinted</div>
+      <div class="rowlink" data-link="#">OLX</div>
+      <div class="rowlink" data-link="#">eBay</div>
+      <div class="rowlink" data-link="#">Facebook Marketplace</div>
+      <div class="rowlink" data-link="#">ss.lv</div>
+      <div class="rowlink" data-link="#">andelemandele</div>
+      <div class="rowlink" data-link="#">Wallapop</div>
+    </div>
+  </dialog>
+
   <script>
-    // переключение вкладок
-    const tabBtns = { upload:document.getElementById('tabUpload'), result:document.getElementById('tabResult'), history:document.getElementById('tabHistory') };
-    const tabs = { upload:document.getElementById('upload'), result:document.getElementById('result'), history:document.getElementById('history') };
+    const tabs = document.querySelectorAll('.tabbtn');
+    const panels = {
+      upload: document.getElementById('panel-upload'),
+      result: document.getElementById('panel-result'),
+      history: document.getElementById('panel-history'),
+    };
+
     function showTab(name){
-      Object.values(tabBtns).forEach(b=>b.classList.remove('active'));
-      Object.values(tabs).forEach(t=>t.classList.remove('active'));
-      tabBtns[name].classList.add('active');
-      tabs[name].classList.add('active');
+      tabs.forEach(b=> b.setAttribute('aria-selected', String(b.dataset.tab===name)));
+      Object.entries(panels).forEach(([k,el])=> el.hidden = k!==name);
+      if(name==='history') renderHistory();
+      if(name==='upload') document.getElementById('file').focus();
     }
-    tabBtns.upload.onclick=()=>showTab('upload');
-    tabBtns.result.onclick=()=>showTab('result');
-    tabBtns.history.onclick=()=>showTab('history');
 
-    const fileInput=document.getElementById('fileInput');
-    const preview=document.getElementById('preview');
-    const resultPhoto=document.getElementById('result-photo');
-    const estimateBtn=document.getElementById('estimateBtn');
-    const resSkeleton=document.getElementById('resSkeleton');
-    const resContent=document.getElementById('resContent');
-    const historyList=document.getElementById('historyList');
-    let history=[];
+    tabs.forEach(btn=> btn.addEventListener('click', ()=> showTab(btn.dataset.tab)));
 
-    // превью при загрузке
-    fileInput.addEventListener('change',e=>{
-      const file=e.target.files[0];
-      if(file){
-        const url=URL.createObjectURL(file);
-        preview.src=url; preview.hidden=false;
-        resultPhoto.src=url; resultPhoto.hidden=false;
-      }
+    // Upload logic
+    const fileInput = document.getElementById('file');
+    const dropzone = document.getElementById('dropzone');
+    const estimateBtn = document.getElementById('estimateBtn');
+    const preview = document.getElementById('preview');
+
+    let currentItem = null; // holds latest mock result
+
+    function setPreview(file){
+      const reader = new FileReader();
+      reader.onload = e => {
+        preview.src = e.target.result;
+        preview.hidden = false;
+        document.getElementById('result-photo').src = e.target.result;
+        estimateBtn.disabled = false;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    fileInput.addEventListener('change', (e)=>{
+      const file = e.target.files?.[0];
+      if(file) setPreview(file);
     });
 
-    // API proxy
-    const API="/.netlify/functions/imv-proxy";
+    ;['dragenter','dragover'].forEach(ev => dropzone.addEventListener(ev, e=>{
+      e.preventDefault(); e.stopPropagation(); dropzone.classList.add('drag');
+    }));
+    ;['dragleave','drop'].forEach(ev => dropzone.addEventListener(ev, e=>{
+      e.preventDefault(); e.stopPropagation(); dropzone.classList.remove('drag');
+    }));
+    dropzone.addEventListener('drop', e=>{
+      const file = e.dataTransfer.files?.[0];
+      if(file && file.type.startsWith('image/')) setPreview(file);
+    });
 
-    async function shrinkDataURL(dataURL, maxW=1280, quality=0.85){
-      const img=new Image(); img.src=dataURL; await img.decode();
-      const k=Math.min(1,maxW/Math.max(img.width,img.height));
-      const w=Math.round(img.width*k), h=Math.round(img.height*k);
-      const c=document.createElement("canvas"); c.width=w; c.height=h;
-      c.getContext("2d").drawImage(img,0,0,w,h);
-      return c.toDataURL("image/jpeg",quality);
-    }
+    // Mock valuation
+    const MOCK = {
+      category: 'Сумка', brand: 'Michael Kors', material: 'Кожа', condition: 'Хорошее',
+      priceMin: 48, priceMax: 63, liquidityPct: 62, date: new Date()
+    };
 
-    async function sendToAPI(dataURL, removeBg){
-      const shrunk=await shrinkDataURL(dataURL,1280,0.85);
-      const res=await fetch(API,{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({ image_base64:shrunk, opts:{remove_bg:!!removeBg} })
-      });
-      if(!res.ok) throw new Error("API "+res.status);
-      return await res.json();
-    }
+    function formatPrice(min,max){ return `💰 Рыночная стоимость: ${min}\u2013${max} \u20ac`; }
 
-    // обработчик кнопки
-    estimateBtn.addEventListener('click', async ()=>{
+    const resPanel = document.getElementById('panel-result');
+    const resContent = document.getElementById('result-content');
+    const resSkeleton = document.getElementById('result-skeleton');
+
+    document.getElementById('priceRange').textContent = formatPrice(MOCK.priceMin, MOCK.priceMax);
+    document.getElementById('m-category').textContent = MOCK.category;
+    document.getElementById('m-brand').textContent = MOCK.brand;
+    document.getElementById('m-material').textContent = MOCK.material;
+    document.getElementById('m-condition').textContent = MOCK.condition;
+
+    estimateBtn.addEventListener('click', ()=>{
+      // show skeleton then result
       showTab('result');
-      resContent.hidden=true; resSkeleton.hidden=false;
-      try{
-        const imgSrc=resultPhoto.src;
-        const payload=await sendToAPI(imgSrc, document.getElementById('bgToggle').checked);
-
-        document.getElementById('priceRange').textContent=`💰 Рыночная стоимость: ${payload.price_min}–${payload.price_max} €`;
-        document.getElementById('m-category').textContent=payload.category||'—';
-        document.getElementById('m-brand').textContent=payload.brand||'—';
-        document.getElementById('m-material').textContent=payload.material||'—';
-        document.getElementById('m-condition').textContent=payload.condition||'—';
-
-        const item={id:Date.now(), thumb:imgSrc, title:`${payload.brand||'Товар'} ${payload.category||''}`.trim(), priceMin:payload.price_min, priceMax:payload.price_max, condition:payload.condition||'—'};
-        history.unshift(item);
-        renderHistory();
-      }catch(e){ alert("Ошибка оценки: "+e.message); }
-      finally{ setTimeout(()=>{resSkeleton.hidden=true; resContent.hidden=false;},300); }
+      resContent.hidden = true; resSkeleton.hidden = false;
+      setTimeout(()=>{
+        // here we could vary the mock slightly
+        currentItem = {
+          id: Date.now(),
+          thumb: document.getElementById('result-photo').src || '',
+          title: `${MOCK.brand} ${MOCK.category}`,
+          priceMin: MOCK.priceMin,
+          priceMax: MOCK.priceMax,
+          condition: MOCK.condition,
+          date: new Date().toISOString()
+        };
+        document.getElementById('priceRange').textContent = formatPrice(currentItem.priceMin, currentItem.priceMax);
+        resSkeleton.hidden = true; resContent.hidden = false;
+      }, 1000);
     });
+
+    // Actions
+    document.getElementById('newBtn').addEventListener('click', ()=>{
+      showTab('upload');
+    });
+
+    document.getElementById('saveBtn').addEventListener('click', ()=>{
+      if(!currentItem) return;
+      const store = JSON.parse(localStorage.getItem('imv_history')||'[]');
+      store.unshift(currentItem);
+      localStorage.setItem('imv_history', JSON.stringify(store));
+      renderHistory();
+      showTab('history');
+    });
+
+    // History rendering
+    const list = document.getElementById('history-list');
+    const empty = document.getElementById('history-empty');
 
     function renderHistory(){
-      if(!history.length){ historyList.innerHTML="История пуста"; return; }
-      historyList.innerHTML="";
-      history.forEach(h=>{
-        const div=document.createElement('div'); div.className="item";
-        div.innerHTML=`<img src="${h.thumb}"/><div><strong>${h.title}</strong><br/>${h.priceMin}–${h.priceMax} €</div>`;
-        historyList.appendChild(div);
+      const store = JSON.parse(localStorage.getItem('imv_history')||'[]');
+      list.innerHTML = '';
+      if(!store.length){ empty.hidden = false; return; }
+      empty.hidden = true;
+      store.forEach(item =>{
+        const row = document.createElement('div');
+        row.className = 'item'; row.role = 'listitem';
+        row.innerHTML = `
+          <img class="thumb" src="${item.thumb||''}" alt="Превью">
+          <div>
+            <div class="title">${item.title}</div>
+            <div class="meta">${new Date(item.date).toLocaleString()} • Состояние: ${item.condition}</div>
+          </div>
+          <div class="price-pill"><span class="dot"></span>${item.priceMin}\u2013${item.priceMax} \u20ac</div>
+        `;
+        row.addEventListener('click', ()=>{
+          // load into result view
+          document.getElementById('result-photo').src = item.thumb||'';
+          document.getElementById('priceRange').textContent = formatPrice(item.priceMin, item.priceMax);
+          resSkeleton.hidden = true; resContent.hidden = false; showTab('result');
+        });
+        list.appendChild(row);
       });
     }
+
+    // Seed demo history once per browser if empty
+    (function seed(){
+      const store = JSON.parse(localStorage.getItem('imv_history')||'[]');
+      if(store.length) return;
+      const demoImg = '';
+      const base = {
+        thumb: demoImg,
+        title: 'Michael Kors Сумка',
+        priceMin: 48, priceMax: 63, condition: 'Хорошее'
+      };
+      const demo = [0,1].map(i=> ({...base, id: Date.now()+i, date: new Date(Date.now()- (i+1)*86400000).toISOString()}));
+      localStorage.setItem('imv_history', JSON.stringify(demo));
+    })();
+
+    // Sell sheet
+    const sheet = document.getElementById('sheet');
+    document.getElementById('sellBtn').addEventListener('click', ()=> sheet.showModal());
+    document.getElementById('closeSheet').addEventListener('click', ()=> sheet.close());
+    sheet.addEventListener('click', e=>{ if(e.target === sheet) sheet.close(); });
+    sheet.querySelectorAll('.rowlink').forEach(el=> el.addEventListener('click', ()=>{
+      // Prototype: do nothing but close
+      sheet.close();
+    }));
+
+    // Initialize view
+    showTab('upload');
   </script>
 </body>
 </html>
